@@ -2,16 +2,8 @@ pipeline {
     agent any
 
     stages {
-        stage('Checkout') {
-            steps {
-                // Clone the repository directly into Jenkins workspace
-                git url: 'https://github.com/Mimaasbr123/calculatrice.git', branch: 'main'
-            }
-        }
-
         stage('Compilation') {
             steps {
-                // Ensure gradlew is executable, then compile
                 sh 'chmod +x gradlew'
                 sh './gradlew clean compileJava'
             }
@@ -22,11 +14,28 @@ pipeline {
                 sh './gradlew test'
             }
         }
+
+        stage('Couverture de code') {
+            steps {
+                // Generate JaCoCo report
+                sh './gradlew jacocoTestReport'
+
+                // Publish JaCoCo HTML report in Jenkins UI
+                publishHTML(target: [
+                    reportDir: 'build/reports/jacoco/test/html',
+                    reportFiles: 'index.html',
+                    reportName: 'Rapport JaCoCo',
+                    keepAll: true,
+                    alwaysLinkToLastBuild: true,
+                    allowMissing: false
+                ])
+            }
+        }
     }
 
     post {
         always {
-            // Publish JUnit test results if available
+            // Always publish test results (JUnit)
             junit allowEmptyResults: true, testResults: 'build/test-results/test/*.xml'
         }
     }
