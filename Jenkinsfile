@@ -4,26 +4,30 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
+                // Clone the repository directly into Jenkins workspace
                 git url: 'https://github.com/Mimaasbr123/calculatrice.git', branch: 'main'
             }
         }
 
         stage('Compilation') {
             steps {
-                dir('calculatrice') {
-                    sh './gradlew clean compileJava'
-                }
+                // Ensure gradlew is executable, then compile
+                sh 'chmod +x gradlew'
+                sh './gradlew clean compileJava'
             }
         }
 
         stage('Tests unitaires') {
             steps {
-                dir('calculatrice') {
-                    sh './gradlew test'
-                }
+                sh './gradlew test'
             }
         }
     }
 
-    
+    post {
+        always {
+            // Publish JUnit test results if available
+            junit allowEmptyResults: true, testResults: 'build/test-results/test/*.xml'
+        }
+    }
 }
