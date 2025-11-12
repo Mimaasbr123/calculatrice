@@ -1,33 +1,47 @@
 pipeline {
     agent any
 
+    environment {
+        JAVA_HOME = '/usr/lib/jvm/java-21-openjdk-amd64'
+        PATH = "${JAVA_HOME}/bin:${PATH}"
+    }
+
     stages {
-        stage('Compilation') {
+        stage('Checkout') {
             steps {
-                sh 'chmod +x gradlew'
-                sh './gradlew clean compileJava'
+                checkout scm
             }
         }
 
-        stage('Tests unitaires') {
+        stage('Build + Tests') {
             steps {
-                sh './gradlew test'
+                sh '''
+                    echo "=== Java version ==="
+                    java -version
+                    chmod +x gradlew
+                    ./gradlew clean test
+                '''
+            }
+            post {
+                always {
+                    junit allowEmptyResults: true, testResults: 'build/test-results/test/**/*.xml'
+                }
             }
         }
 
-        stage('Couverture de code') {
+        stage('Génération JaCoCo') {
             steps {
-                // Generate JaCoCo report
                 sh './gradlew jacocoTestReport'
+            }
+        }
 
-                // Publish JaCoCo HTML report in Jenkins UI
+        stage('Analyse statique du code') {
+            steps {
+                sh './gradlew checkstyleMain'
                 publishHTML(target: [
-                    reportDir: 'build/reports/jacoco/test/html',
-                    reportFiles: 'index.html',
-                    reportName: 'Rapport JaCoCo',
-                    keepAll: true,
-                    alwaysLinkToLastBuild: true,
-                    allowMissing: false
+                    reportDir: 'build/reports/checkstyle/',
+                    reportFiles: 'main.html',
+                    reportName: 'Checkstyle Report'
                 ])
             }
         }
@@ -35,8 +49,20 @@ pipeline {
 
     post {
         always {
-            // Always publish test results (JUnit)
-            junit allowEmptyResults: true, testResults: 'build/test-results/test/*.xml'
+            // Analyse JaCoCo pour afficher la couverture dans Jenkins
+            jacoco(
+                execPattern: '**/jacoco.exec',
+                classPattern: 'build/classes/java/main',
+                sourcePattern: 'src/main/java',
+                exclusionPattern: ''
+            )
+
+            // Publication du rapport HTML JaCoCo
+            publishHTML(target: [
+                reportDir: 'build/reports/jacoco/test/html',
+                reportFiles: 'index.html',
+                reportName: 'Rapport JaCoCo HTML'
+            ])
         }
     }
 }
